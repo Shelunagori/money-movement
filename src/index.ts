@@ -3,6 +3,7 @@ import 'dotenv/config';
 import { config } from './config.js';
 import { pool } from './db.js';
 import { buildServer } from './server.js';
+import { logger } from './logger.js';
 
 async function main(): Promise<void> {
   await pool.query('SELECT 1 AS ok');
@@ -14,5 +15,6 @@ async function main(): Promise<void> {
   app.log.info('Server started');
 }
 main().catch((error) => {
+  logger.error({ err: error }, 'startup failed')
   process.exit(1);
 });
