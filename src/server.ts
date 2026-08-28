@@ -1,9 +1,10 @@
 import Fastify from 'fastify';
 import { pool } from './db.js';
+import { logger } from './logger.js';
 
 export function buildServer() {
   const app = Fastify({
-    logger: true,
+    loggerInstance: logger,
   });
 
   // routes get registered here
