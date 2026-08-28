@@ -17,37 +17,48 @@ were trusted.
 - **Fail-fast, fail-loud startup** — all config is parsed and validated
   before any money code can run; a missing env var kills the deploy,
   not a 11 PM transfer
-- **Degrade-don't-crash runtime** — a PostgreSQL outage turns into
-  503s + structured warn logs, and the service recovers without a
-  restart (found and fixed a real crash here: `pg` pools emit errors
-  on idle connections, outside any try/catch)
+- **Degrade-don't-crash runtime** — a PostgreSQL outage turns into 503s
+  plus structured warn logs, and the service recovers without a restart
+  (found and fixed a real crash here: `pg` pools emit errors on idle
+  connections, outside any try/catch)
 - **Exact money representation** — integer minor units in `bigint`;
-  no floats anywhere near an amount; currency is attached to every
-  value and mismatches throw
+  no floats anywhere near an amount; currency is attached to every value
+  and mismatches throw
 - **Integration + unit tests** via Vitest, including failure paths
+
+## Why these choices
+
+**Modular monolith + worker, one PostgreSQL.** The core invariant of a
+ledger — all entries of one operation commit atomically or not at all —
+lives inside single-database ACID transactions. A service boundary through
+the ledger would destroy exactly the guarantee this system exists to provide.
+
+**Raw SQL over an ORM.** Financial correctness comes directly from
+PostgreSQL: row locking (`SELECT FOR UPDATE`), isolation levels, and
+transaction boundaries that are visible in the code as explicit
+`BEGIN`/`COMMIT`/`ROLLBACK`. If a tool hides those mechanisms, it is also
+hiding part of the system's correctness model.
 
 ## Roadmap (in build order)
 
 Double-entry ledger with enforced debits=credits → atomic internal
 transfers → idempotency keys → concurrency control (SELECT FOR UPDATE,
 tested under parallel load) → transaction state machine → simulated
-payment provider with injected failures → transactional outbox →
-retries with backoff → webhook dedup/out-of-order handling →
-reconciliation engine → card auth/capture/refund lifecycle.
-
-## Why these choices
-
-This starts as a monolith because the hard problems here are correctness and transaction boundaries, not distributed systems. Keeping the ledger and transfer logic in one process makes those guarantees easier to reason about and test.
-
-I’m using raw SQL because database behavior is part of the system design: transactions, locks, constraints, and failure modes need to stay visible. For a money movement system, I’d rather understand exactly what PostgreSQL is doing than hide those details behind an ORM.
+payment provider with injected failures → transactional outbox → retries
+with backoff → webhook dedup/out-of-order handling → reconciliation
+engine → card auth/capture/refund lifecycle.
 
 ## Run
 
+```bash
 docker compose up -d
 cp .env.example .env
 npm install
 npm run dev     # API on :3000
+```
 
 ## Test
 
+```bash
 npm test
+```
