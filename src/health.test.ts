@@ -1,8 +1,12 @@
-import { describe, it, expect, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { buildServer } from './server.js';
 import { pool } from './shared/db.js';
 
-const app = buildServer();
+let app: Awaited<ReturnType<typeof buildServer>>;
+
+beforeAll(async () => {
+  app = await buildServer();
+});
 
 describe('GET /health', () => {
   it('returns 200 when database is reachable', async () => {
@@ -20,5 +24,4 @@ describe('GET /health', () => {
 
 afterAll(async () => {
   await app.close();
-  await pool.end();
 });

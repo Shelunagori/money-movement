@@ -9,14 +9,16 @@ let accountFees: string;
 let accountBal: string; // INR — balance test ke liye
 
 beforeAll(async () => {
+  const suffix = Date.now();
   const res = await pool.query(
     `INSERT INTO ledger_accounts (name, type, currency) VALUES
-       ('test_acc_a', 'LIABILITY', 'INR'),
-       ('test_acc_b', 'LIABILITY', 'INR'),
-       ('test_acc_usd', 'LIABILITY', 'USD'),
-       ('test_acc_fees', 'LIABILITY', 'INR'),
-       ('test_acc_bal', 'LIABILITY', 'INR')
-     RETURNING id`
+       ($1, 'LIABILITY', 'INR'),
+       ($2, 'LIABILITY', 'INR'),
+       ($3, 'LIABILITY', 'USD'),
+       ($4, 'LIABILITY', 'INR'),
+       ($5, 'LIABILITY', 'INR')
+     RETURNING id`,
+    [`test_acc_a_${suffix}`, `test_acc_b_${suffix}`, `test_acc_usd_${suffix}`, `test_acc_fees_${suffix}`, `test_acc_bal_${suffix}`]
   );
 
   [accountA, accountB, accountUsd, accountFees, accountBal] =
@@ -200,12 +202,6 @@ describe('postLedgerTransaction', () => {
 });
 
 afterAll(async () => {
-  await pool.query(`TRUNCATE ledger_entries`);
-  await pool.query(
-    `DELETE FROM ledger_transactions WHERE type LIKE 'TEST_%'`
-  );
-  await pool.query(
-    `DELETE FROM ledger_accounts WHERE name LIKE 'test_acc_%'`
-  );
-  await pool.end();
+  // Accounts are left in the database since ledger_entries are immutable
+  // and have foreign key constraints. They won't conflict because of unique suffixes.
 });
