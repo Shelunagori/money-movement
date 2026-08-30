@@ -25,103 +25,108 @@ interface CreateTransferResult {
   ledgerTransactionId: string;
 }
 
+export async function createTransferOnClient(
+  client: pg.PoolClient,
+  input: CreateTransferInput
+): Promise<CreateTransferResult> {
+  // Load both accounts' currency
+  const accountsResult = await client.query(
+    `SELECT id, currency FROM ledger_accounts WHERE id = ANY($1)`,
+    [[input.fromAccountId, input.toAccountId]]
+  );
+
+  const accounts = new Map(
+    accountsResult.rows.map((row) => [row.id, row.currency])
+  );
+
+  // Unknown account check
+  if (!accounts.has(input.fromAccountId) || !accounts.has(input.toAccountId)) {
+    throw new AccountNotFoundError('Unknown ledger account');
+  }
+
+  // Different currencies check
+  const fromCurrency = accounts.get(input.fromAccountId);
+  const toCurrency = accounts.get(input.toAccountId);
+  if (fromCurrency !== toCurrency) {
+    throw new CurrencyMismatchError(
+      `Currency mismatch across accounts: ${fromCurrency}, ${toCurrency}`
+    );
+  }
+
+  // Compute from-account balance on the same client
+  // NOT concurrency-safe yet — two parallel transfers can both pass this check.
+  // Fixed in Phase 6 with SELECT FOR UPDATE.
+  const balanceResult = await client.query(
+    `SELECT COALESCE(
+      SUM(
+        CASE
+        WHEN direction = 'CREDIT' THEN amount
+        ELSE -amount
+        END
+      ),
+      0
+    ) AS balance
+    FROM ledger_entries
+    WHERE ledger_account_id = $1`,
+    [input.fromAccountId]
+  );
+
+  const balance = BigInt(balanceResult.rows[0].balance);
+  if (balance < input.amountMinor) {
+    throw new InsufficientFundsError('Insufficient funds');
+  }
+
+  // Post ledger transaction with 2 entries
+  const ledgerTransactionId = await postLedgerTransactionOnClient(client, {
+    type: 'INTERNAL_TRANSFER',
+    entries: [
+      {
+        accountId: input.fromAccountId,
+        direction: 'DEBIT',
+        amountMinor: input.amountMinor,
+      },
+      {
+        accountId: input.toAccountId,
+        direction: 'CREDIT',
+        amountMinor: input.amountMinor,
+      },
+    ],
+  });
+
+  // Insert transfer record
+  const transferResult = await client.query(
+    `INSERT INTO transfers (
+      from_account_id,
+      to_account_id,
+      amount,
+      currency,
+      status,
+      ledger_transaction_id
+    )
+    VALUES ($1, $2, $3, $4, $5, $6)
+    RETURNING id`,
+    [
+      input.fromAccountId,
+      input.toAccountId,
+      String(input.amountMinor),
+      fromCurrency,
+      'COMPLETED',
+      ledgerTransactionId,
+    ]
+  );
+
+  const transferId = transferResult.rows[0].id as string;
+
+  return {
+    transferId,
+    ledgerTransactionId,
+  };
+}
+
 export async function createTransfer(
   input: CreateTransferInput
 ): Promise<CreateTransferResult> {
-  return withTransaction(async (client) => {
-    // Load both accounts' currency
-    const accountsResult = await client.query(
-      `SELECT id, currency FROM ledger_accounts WHERE id = ANY($1)`,
-      [[input.fromAccountId, input.toAccountId]]
-    );
-
-    const accounts = new Map(
-      accountsResult.rows.map((row) => [row.id, row.currency])
-    );
-
-    // Unknown account check
-    if (!accounts.has(input.fromAccountId) || !accounts.has(input.toAccountId)) {
-      throw new AccountNotFoundError('Unknown ledger account');
-    }
-
-    // Different currencies check
-    const fromCurrency = accounts.get(input.fromAccountId);
-    const toCurrency = accounts.get(input.toAccountId);
-    if (fromCurrency !== toCurrency) {
-      throw new CurrencyMismatchError(
-        `Currency mismatch across accounts: ${fromCurrency}, ${toCurrency}`
-      );
-    }
-
-    // Compute from-account balance on the same client
-    // NOT concurrency-safe yet — two parallel transfers can both pass this check.
-    // Fixed in Phase 6 with SELECT FOR UPDATE.
-    const balanceResult = await client.query(
-      `SELECT COALESCE(
-        SUM(
-          CASE
-          WHEN direction = 'CREDIT' THEN amount
-          ELSE -amount
-          END
-        ),
-        0
-      ) AS balance
-      FROM ledger_entries
-      WHERE ledger_account_id = $1`,
-      [input.fromAccountId]
-    );
-
-    const balance = BigInt(balanceResult.rows[0].balance);
-    if (balance < input.amountMinor) {
-      throw new InsufficientFundsError('Insufficient funds');
-    }
-
-    // Post ledger transaction with 2 entries
-    const ledgerTransactionId = await postLedgerTransactionOnClient(client, {
-      type: 'INTERNAL_TRANSFER',
-      entries: [
-        {
-          accountId: input.fromAccountId,
-          direction: 'DEBIT',
-          amountMinor: input.amountMinor,
-        },
-        {
-          accountId: input.toAccountId,
-          direction: 'CREDIT',
-          amountMinor: input.amountMinor,
-        },
-      ],
-    });
-
-    // Insert transfer record
-    const transferResult = await client.query(
-      `INSERT INTO transfers (
-        from_account_id,
-        to_account_id,
-        amount,
-        currency,
-        status,
-        ledger_transaction_id
-      )
-      VALUES ($1, $2, $3, $4, $5, $6)
-      RETURNING id`,
-      [
-        input.fromAccountId,
-        input.toAccountId,
-        String(input.amountMinor),
-        fromCurrency,
-        'COMPLETED',
-        ledgerTransactionId,
-      ]
-    );
-
-    const transferId = transferResult.rows[0].id as string;
-
-    return {
-      transferId,
-      ledgerTransactionId,
-    };
-  });
+  return withTransaction((client) => createTransferOnClient(client, input));
 }
 
 export async function getTransfer(
