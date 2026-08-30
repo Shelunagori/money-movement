@@ -1,4 +1,4 @@
-import { withTransaction } from './db.js';
+import { withTransaction, pool } from './db.js';
 
 interface EntryInput {
   accountId: string;
@@ -102,4 +102,29 @@ export async function postLedgerTransaction(
 
     return transactionId;
   });
+}
+
+
+export async function getBalance(accountId: string): Promise<bigint> {
+  const result = await pool.query(
+    `
+        SELECT COALESCE(
+        SUM(
+            CASE
+            WHEN direction = 'CREDIT' THEN amount
+            ELSE -amount
+            END
+        ),
+        0
+        ) AS balance
+        FROM ledger_entries
+        WHERE ledger_account_id = $1
+    `,
+    [accountId]
+  );
+
+  // Balance convention: CREDIT - DEBIT.
+  // For LIABILITY accounts (e.g. user wallets), this represents
+  // the amount owed to / owned by the user. ASSET accounts read inversely.
+  return BigInt(result.rows[0].balance);
 }
