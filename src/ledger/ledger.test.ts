@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { pool } from './db.js';
+import { pool } from '../shared/db.js';
 import { postLedgerTransaction, getBalance } from './ledger.js';
 
 let accountA: string;   // INR

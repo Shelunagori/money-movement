@@ -1,6 +1,6 @@
 import { describe, it, expect, afterAll } from 'vitest';
 import { buildServer } from './server.js';
-import { pool } from './db.js';
+import { pool } from './shared/db.js';
 
 const app = buildServer();
 

@@ -1,6 +1,6 @@
 import Fastify from 'fastify';
-import { pool } from './db.js';
-import { logger } from './logger.js';
+import { pool } from './shared/db.js';
+import { logger } from './shared/logger.js';
 
 export function buildServer() {
   const app = Fastify({

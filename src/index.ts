@@ -1,9 +1,9 @@
 import 'dotenv/config';
 
-import { config } from './config.js';
-import { pool } from './db.js';
+import { config } from './shared/config.js';
+import { pool } from './shared/db.js';
 import { buildServer } from './server.js';
-import { logger } from './logger.js';
+import { logger } from './shared/logger.js';
 
 async function main(): Promise<void> {
   await pool.query('SELECT 1 AS ok');

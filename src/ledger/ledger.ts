@@ -1,4 +1,4 @@
-import { withTransaction, pool } from './db.js';
+import { withTransaction, pool } from '../shared/db.js';
 
 interface EntryInput {
   accountId: string;
