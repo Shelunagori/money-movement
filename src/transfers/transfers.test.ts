@@ -44,6 +44,7 @@ describe('POST /transfers', () => {
     const res = await app.inject({
       method: 'POST',
       url: '/transfers',
+      headers: { 'idempotency-key': 'test-phase4-' + Math.random() },
       payload: {
         fromAccountId: accountA,
         toAccountId: accountB,
@@ -86,6 +87,7 @@ describe('POST /transfers', () => {
     const res = await app.inject({
       method: 'POST',
       url: '/transfers',
+      headers: { 'idempotency-key': 'test-phase4-' + Math.random() },
       payload: {
         fromAccountId: accountEmpty,
         toAccountId: accountB,
@@ -116,6 +118,7 @@ describe('POST /transfers', () => {
     const res = await app.inject({
       method: 'POST',
       url: '/transfers',
+      headers: { 'idempotency-key': 'test-phase4-' + Math.random() },
       payload: {
         fromAccountId: fakeUuid,
         toAccountId: accountB,
@@ -132,6 +135,7 @@ describe('POST /transfers', () => {
     const res = await app.inject({
       method: 'POST',
       url: '/transfers',
+      headers: { 'idempotency-key': 'test-phase4-' + Math.random() },
       payload: {
         fromAccountId: accountA,
         toAccountId: accountA,
@@ -146,6 +150,7 @@ describe('POST /transfers', () => {
     const res = await app.inject({
       method: 'POST',
       url: '/transfers',
+      headers: { 'idempotency-key': 'test-phase4-' + Math.random() },
       payload: {
         fromAccountId: accountA,
         toAccountId: accountB,
@@ -160,6 +165,7 @@ describe('POST /transfers', () => {
     const res = await app.inject({
       method: 'POST',
       url: '/transfers',
+      headers: { 'idempotency-key': 'test-phase4-' + Math.random() },
       payload: {
         fromAccountId: accountA,
         toAccountId: accountB,
@@ -174,6 +180,7 @@ describe('POST /transfers', () => {
     const res = await app.inject({
       method: 'POST',
       url: '/transfers',
+      headers: { 'idempotency-key': 'test-phase4-' + Math.random() },
       payload: {
         fromAccountId: accountA,
         toAccountId: accountB,
@@ -188,6 +195,7 @@ describe('POST /transfers', () => {
     const res = await app.inject({
       method: 'POST',
       url: '/transfers',
+      headers: { 'idempotency-key': 'test-phase4-' + Math.random() },
       payload: {
         fromAccountId: accountA,
         toAccountId: accountB,
@@ -202,6 +210,7 @@ describe('POST /transfers', () => {
     const res = await app.inject({
       method: 'POST',
       url: '/transfers',
+      headers: { 'idempotency-key': 'test-phase4-' + Math.random() },
       payload: {
         fromAccountId: accountA,
         toAccountId: accountUsd,
@@ -221,12 +230,14 @@ describe('GET /transfers/:id', () => {
     const createRes = await app.inject({
       method: 'POST',
       url: '/transfers',
+      headers: { 'idempotency-key': 'test-phase4-get-' + Math.random() },
       payload: {
         fromAccountId: accountA,
         toAccountId: accountB,
         amountMinor: 500,
       },
     });
+    expect(createRes.statusCode).toBe(201);
     const createBody = JSON.parse(createRes.body);
     const transferId = createBody.transferId;
 
