@@ -1,8 +1,9 @@
 import Fastify from 'fastify';
 import { pool } from './shared/db.js';
 import { logger } from './shared/logger.js';
+import { registerTransferRoutes } from './transfers/routes.js';
 
-export function buildServer() {
+export async function buildServer() {
   const app = Fastify({
     loggerInstance: logger,
   });
@@ -19,5 +20,8 @@ export function buildServer() {
         })
     }
   });
+
+  await registerTransferRoutes(app);
+
   return app;
 }
