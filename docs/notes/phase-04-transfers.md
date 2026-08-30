@@ -44,30 +44,6 @@ This holds an exclusive lock until the transaction commits, forcing serializatio
 
 ---
 
-## Interview Questions & Answers
-
-### Q1: Why is the balance check not concurrency-safe, and what's the Phase 6 solution?
-
-**A**: Two parallel transfers on the same account can both read the balance before either commits, both pass the check, and overdraw the account. Phase 6 fixes this with `SELECT ... FOR UPDATE` to lock the account row, serializing concurrent operations on the same account and preventing the race.
-
-### Q2: Why do we refactor `postLedgerTransaction` into `postLedgerTransactionOnClient`?
-
-**A**: The transfers flow needs to post a ledger transaction as part of a larger atomic operation (balance check, transfer record insertion). Extracting the logic lets transfers call it on the same DB client within the same transaction, ensuring all-or-nothing semantics.
-
-### Q3: How does the transfers table support idempotent retry?
-
-**A**: Future phases can use a transfer `id` as an idempotency key. A client retrying with the same transfer ID finds the existing COMPLETED or FAILED row and doesn't create a duplicate. Currently Phase 4 doesn't implement retry logic, but the schema is ready.
-
-### Q4: What prevents a transfer from an account to itself?
-
-**A**: The database constraint `CHECK (from_account_id <> to_account_id)` rejects any insert where both IDs are the same, returning a 422 error. This is a hard constraint, not just application logic.
-
-### Q5: Why is the currency in the transfers table separate from querying ledger_accounts each time?
-
-**A**: Denormalizing the currency into the transfers row avoids a join and provides a snapshot of the currency at transfer time (useful if account types/currencies change in the future). It also simplifies the GET /transfers/:id response without requiring extra queries.
-
----
-
 ## Testing Notes
 
 - Test suite creates temporary accounts with prefix `test_tr_` and cleans them up in `afterAll`.
