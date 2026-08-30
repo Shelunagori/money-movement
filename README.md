@@ -11,9 +11,23 @@ were trusted.
 
 ## Built and tested so far
 
-- **Strict TypeScript foundation** — `noUncheckedIndexedAccess`,
-  `exactOptionalPropertyTypes`; empty query results are compile-time
-  concerns, not runtime surprises
+- **Double-entry ledger with database-enforced invariants** — every
+  transaction's debits must equal its credits (guarded in code, verified
+  by a global invariant test over the whole ledger); amounts are
+  `BIGINT` with `CHECK (amount > 0)`; account and direction validity
+  are enforced by FK and CHECK constraints, not application discipline
+- **Tamper-proof history** — ledger entries are immutable at the
+  database level: a trigger rejects every `UPDATE` and `DELETE`, and a
+  test proves it by trying both
+- **Balances derived, never stored** — an account's balance is computed
+  from its immutable entries, so it is reproducible from history at any
+  point in time
+- **Multi-leg transactions** — a transfer with a fee split posts as one
+  atomic transaction with three balanced entries, not as bolted-on
+  arithmetic
+- **Exact money representation** — integer minor units in `bigint`;
+  no floats anywhere near an amount; currency is attached to every value
+  and mismatches are rejected at both the Money and ledger level
 - **Fail-fast, fail-loud startup** — all config is parsed and validated
   before any money code can run; a missing env var kills the deploy,
   not a 11 PM transfer
@@ -21,10 +35,12 @@ were trusted.
   plus structured warn logs, and the service recovers without a restart
   (found and fixed a real crash here: `pg` pools emit errors on idle
   connections, outside any try/catch)
-- **Exact money representation** — integer minor units in `bigint`;
-  no floats anywhere near an amount; currency is attached to every value
-  and mismatches throw
-- **Integration + unit tests** via Vitest, including failure paths
+- **Strict TypeScript foundation** — `noUncheckedIndexedAccess`,
+  `exactOptionalPropertyTypes`; empty query results are compile-time
+  concerns, not runtime surprises
+- **21 tests via Vitest** — unit + integration, failure paths first:
+  unbalanced, mixed-currency, and single-entry transactions are proven
+  to persist nothing
 
 ## Why these choices
 
@@ -41,12 +57,12 @@ hiding part of the system's correctness model.
 
 ## Roadmap (in build order)
 
-Double-entry ledger with enforced debits=credits → atomic internal
-transfers → idempotency keys → concurrency control (SELECT FOR UPDATE,
-tested under parallel load) → transaction state machine → simulated
-payment provider with injected failures → transactional outbox → retries
-with backoff → webhook dedup/out-of-order handling → reconciliation
-engine → card auth/capture/refund lifecycle.
+~~Double-entry ledger with enforced debits=credits~~ ✅ → atomic internal
+transfers (in progress) → idempotency keys → concurrency control
+(SELECT FOR UPDATE, tested under parallel load) → transaction state
+machine → simulated payment provider with injected failures →
+transactional outbox → retries with backoff → webhook dedup/out-of-order
+handling → reconciliation engine → card auth/capture/refund lifecycle.
 
 ## Run
 
