@@ -19,6 +19,14 @@ were trusted.
 - **Tamper-proof history** — ledger entries are immutable at the
   database level: a trigger rejects every `UPDATE` and `DELETE`, and a
   test proves it by trying both
+- **Atomic internal transfers** — POST /transfers posts a balanced
+  ledger transaction and the transfer record in one database
+  transaction; insufficient funds, unknown accounts, and currency
+  mismatches are rejected and persist nothing
+- **Idempotent money movement** — every transfer requires an
+  Idempotency-Key; duplicate and concurrent retries replay the stored
+  response and move money exactly once (proven by a concurrent-
+  duplicates test); same key with a different body is rejected with 409
 - **Balances derived, never stored** — an account's balance is computed
   from its immutable entries, so it is reproducible from history at any
   point in time
@@ -38,7 +46,7 @@ were trusted.
 - **Strict TypeScript foundation** — `noUncheckedIndexedAccess`,
   `exactOptionalPropertyTypes`; empty query results are compile-time
   concerns, not runtime surprises
-- **21 tests via Vitest** — unit + integration, failure paths first:
+- **38 tests via Vitest** — unit + integration, failure paths first:
   unbalanced, mixed-currency, and single-entry transactions are proven
   to persist nothing
 
@@ -57,12 +65,13 @@ hiding part of the system's correctness model.
 
 ## Roadmap (in build order)
 
-~~Double-entry ledger with enforced debits=credits~~ ✅ → atomic internal
-transfers (in progress) → idempotency keys → concurrency control
-(SELECT FOR UPDATE, tested under parallel load) → transaction state
-machine → simulated payment provider with injected failures →
-transactional outbox → retries with backoff → webhook dedup/out-of-order
-handling → reconciliation engine → card auth/capture/refund lifecycle.
+~~Double-entry ledger with enforced debits=credits~~ ✅ →
+~~atomic internal transfers~~ ✅ → ~~idempotency keys~~ ✅ →
+concurrency control (SELECT FOR UPDATE, tested under parallel load — in
+progress) → transaction state machine → simulated payment provider with
+injected failures → transactional outbox → retries with backoff → webhook
+dedup/out-of-order handling → reconciliation engine → card auth/capture/refund
+lifecycle.
 
 ## Run
 
