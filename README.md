@@ -27,6 +27,11 @@ were trusted.
   Idempotency-Key; duplicate and concurrent retries replay the stored
   response and move money exactly once (proven by a concurrent-
   duplicates test); same key with a different body is rejected with 409
+- **Concurrency-safe spending** — account rows are locked in sorted
+  order (SELECT FOR UPDATE), so parallel transfers serialize per
+  account: 10 concurrent spends against one balance cannot overspend,
+  and opposite-direction transfers cannot deadlock — all proven by
+  parallel tests
 - **Balances derived, never stored** — an account's balance is computed
   from its immutable entries, so it is reproducible from history at any
   point in time
@@ -46,9 +51,10 @@ were trusted.
 - **Strict TypeScript foundation** — `noUncheckedIndexedAccess`,
   `exactOptionalPropertyTypes`; empty query results are compile-time
   concerns, not runtime surprises
-- **38 tests via Vitest** — unit + integration, failure paths first:
+- **41 tests via Vitest** — unit + integration, failure paths first:
   unbalanced, mixed-currency, and single-entry transactions are proven
-  to persist nothing
+  to persist nothing; concurrency-safe spending verified under 10-way
+  parallel load and opposite-direction transfers
 
 ## Why these choices
 
@@ -67,11 +73,10 @@ hiding part of the system's correctness model.
 
 ~~Double-entry ledger with enforced debits=credits~~ ✅ →
 ~~atomic internal transfers~~ ✅ → ~~idempotency keys~~ ✅ →
-concurrency control (SELECT FOR UPDATE, tested under parallel load — in
-progress) → transaction state machine → simulated payment provider with
-injected failures → transactional outbox → retries with backoff → webhook
-dedup/out-of-order handling → reconciliation engine → card auth/capture/refund
-lifecycle.
+~~concurrency control~~ ✅ → transaction state machine (in progress) →
+simulated payment provider with injected failures → transactional outbox →
+retries with backoff → webhook dedup/out-of-order handling → reconciliation
+engine → card auth/capture/refund lifecycle.
 
 ## Run
 
