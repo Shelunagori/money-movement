@@ -281,6 +281,67 @@ describe('Idempotent POST /transfers', () => {
     );
     expect(Number(transfers.rows[0].cnt)).toBe(1);
   });
+
+  it('stale IN_PROGRESS key (>15 min old) is reclaimed and request succeeds', async () => {
+    const staleKey = 'test-idem-stale-' + Date.now();
+
+    // Insert a stale IN_PROGRESS key (20 minutes old)
+    const hash = 'test-hash-' + Date.now();
+    await pool.query(
+      `INSERT INTO idempotency_keys (key, request_hash, status, created_at)
+       VALUES ($1, $2, 'IN_PROGRESS', now() - interval '20 minutes')`,
+      [staleKey, hash]
+    );
+
+    // Attempt a transfer with this key
+    const res = await app.inject({
+      method: 'POST',
+      url: '/transfers',
+      headers: { 'idempotency-key': staleKey },
+      payload: {
+        fromAccountId: accountA,
+        toAccountId: accountB,
+        amountMinor: 500,
+      },
+    });
+
+    // Should succeed (201) because the stale key was reclaimed
+    expect(res.statusCode).toBe(201);
+
+    // Verify the key status was updated to COMPLETED
+    const keyCheck = await pool.query(
+      `SELECT status FROM idempotency_keys WHERE key = $1`,
+      [staleKey]
+    );
+    expect(keyCheck.rows[0].status).toBe('COMPLETED');
+  });
+
+  it('fresh IN_PROGRESS key still returns 409', async () => {
+    const freshKey = 'test-idem-fresh-' + Date.now();
+
+    // Insert a fresh IN_PROGRESS key (1 second old)
+    const hash = 'test-hash-' + Date.now();
+    await pool.query(
+      `INSERT INTO idempotency_keys (key, request_hash, status, created_at)
+       VALUES ($1, $2, 'IN_PROGRESS', now() - interval '1 second')`,
+      [freshKey, hash]
+    );
+
+    // Attempt a transfer with this key
+    const res = await app.inject({
+      method: 'POST',
+      url: '/transfers',
+      headers: { 'idempotency-key': freshKey },
+      payload: {
+        fromAccountId: accountA,
+        toAccountId: accountB,
+        amountMinor: 500,
+      },
+    });
+
+    // Should fail with 409 because the key is fresh and still IN_PROGRESS
+    expect(res.statusCode).toBe(409);
+  });
 });
 
 afterAll(async () => {

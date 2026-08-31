@@ -55,11 +55,13 @@ executing under an old key.
 
 - **At-most-once execution per key.** Concurrent duplicates lose the
   claim race and see IN_PROGRESS (409) or the completed response.
-- **A crash after claiming but before COMMIT leaves the key IN_PROGRESS
-  forever** in this implementation; retries get 409. A production system
-  adds an expiry/reclaim policy (e.g. keys older than N hours may be
-  retried). Acceptable for this project's current scope, documented here
-  deliberately.
+- **Stale IN_PROGRESS keys are reclaimed after 15 minutes.** A crash or
+  network failure that leaves a key IN_PROGRESS is automatically recovered:
+  after 15 minutes, a new request with the same key triggers an atomic
+  UPDATE that reclaims the key and re-executes the transfer. Tradeoff: if
+  the original request is still running after 15 minutes (extremely unlikely
+  for transfers, which complete in milliseconds), the operation could
+  double-execute. Production systems pair this with request-level timeouts.
 - **Clients must send Idempotency-Key** — requests without it are
   rejected with 400.
 - **Same key + different body is an error (409), never a retry** — the
