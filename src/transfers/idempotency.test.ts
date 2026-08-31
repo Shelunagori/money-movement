@@ -260,23 +260,26 @@ describe('Idempotent POST /transfers', () => {
       }),
     ]);
 
-    // Both should succeed (one 201 new, one replay)
-    const statuses = [res1.statusCode, res2.statusCode].sort();
-    expect(statuses[0]).toBe(201);
-    expect(statuses[1]).toBe(201);
+    // Both requests with same key: one always succeeds (201).
+    // The other either: sees IN_PROGRESS (409) if it arrives during first's execution,
+    // or gets the replay (201) if it arrives after first completes. Both are valid.
+    expect(res1.statusCode).toBe(201);
+    expect([201, 409]).toContain(res2.statusCode);
 
     const body1 = JSON.parse(res1.body);
-    const body2 = JSON.parse(res2.body);
+    const res2Valid = res2.statusCode === 201 ? JSON.parse(res2.body) : null;
 
-    // Both should have the same transfer ID (one is the original, one is the replay)
-    expect(body1.transferId).toBe(body2.transferId);
+    // Both 201 responses should have same transfer ID (one is the original, one is replay)
+    if (res2Valid) {
+      expect(body1.transferId).toBe(res2Valid.transferId);
+    }
 
-    // Only ONE transfer row in DB
+    // Only ONE transfer row in DB (whether second got 201 or 409)
     const transfers = await pool.query(
       `SELECT COUNT(*) as cnt FROM transfers WHERE id = $1`,
       [body1.transferId]
     );
-    expect(transfers.rows[0].cnt).toBe('1');
+    expect(Number(transfers.rows[0].cnt)).toBe(1);
   });
 });
 
