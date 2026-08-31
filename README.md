@@ -1,5 +1,7 @@
 # Money Movement Ledger
 
+[![CI](https://github.com/anthropics/money-movement/actions/workflows/ci.yml/badge.svg)](https://github.com/anthropics/money-movement/actions/workflows/ci.yml)
+
 A production-style money movement backend built from scratch in TypeScript,
 with a focus on the problems that make financial systems hard: atomicity,
 exact arithmetic, idempotency, concurrency, and reconciliation.
