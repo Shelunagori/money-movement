@@ -37,6 +37,7 @@ jobs:
       - name: Run migrations
         env:
           DATABASE_URL: postgresql://postgres:password@localhost:5432/money_movement
+          PORT: "3000"
         run: npm run migrate up
 
       - name: Type check
@@ -45,4 +46,5 @@ jobs:
       - name: Run tests
         env:
           DATABASE_URL: postgresql://postgres:password@localhost:5432/money_movement
+          PORT: "3000"
         run: npm test
