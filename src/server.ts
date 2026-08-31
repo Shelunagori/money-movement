@@ -2,6 +2,7 @@ import Fastify from 'fastify';
 import { pool } from './shared/db.js';
 import { logger } from './shared/logger.js';
 import { registerTransferRoutes } from './transfers/routes.js';
+import { registerLedgerRoutes } from './ledger/routes.js';
 
 export async function buildServer() {
   const app = Fastify({
@@ -22,6 +23,7 @@ export async function buildServer() {
   });
 
   await registerTransferRoutes(app);
+  await registerLedgerRoutes(app);
 
   return app;
 }
