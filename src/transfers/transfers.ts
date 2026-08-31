@@ -29,9 +29,10 @@ export async function createTransferOnClient(
   client: pg.PoolClient,
   input: CreateTransferInput
 ): Promise<CreateTransferResult> {
-  // Load both accounts' currency
+  // Load both accounts' currency and lock them (Phase 6: pessimistic locking)
   const accountsResult = await client.query(
-    `SELECT id, currency FROM ledger_accounts WHERE id = ANY($1)`,
+    `SELECT id, currency FROM ledger_accounts WHERE id = ANY($1)
+     ORDER BY id FOR UPDATE`,
     [[input.fromAccountId, input.toAccountId]]
   );
 
@@ -54,8 +55,9 @@ export async function createTransferOnClient(
   }
 
   // Compute from-account balance on the same client
-  // NOT concurrency-safe yet — two parallel transfers can both pass this check.
-  // Fixed in Phase 6 with SELECT FOR UPDATE.
+  // Account rows are locked in sorted order above (FOR UPDATE), so this read
+  // is serialized per account: concurrent transfers on the same account cannot
+  // both pass the balance check. See ADR-006 for pessimistic locking design.
   const balanceResult = await client.query(
     `SELECT COALESCE(
       SUM(
