@@ -199,6 +199,98 @@ describe('postLedgerTransaction', () => {
 
     expect(totalDebits).toBe(totalCredits);
   });
+
+  it('database enforces debits=credits at commit time via deferred trigger', async () => {
+    const client = await pool.connect();
+    try {
+      // Start transaction
+      await client.query('BEGIN');
+
+      // Insert an unbalanced transaction: 1000 debit, 900 credit
+      // Use unique type to avoid test pollution
+      const txType = 'TEST_TRIGGER_UNBALANCED_' + Date.now();
+      const txRes = await client.query(
+        `INSERT INTO ledger_transactions (type) VALUES ($1) RETURNING id`,
+        [txType]
+      );
+      const txId = txRes.rows[0].id;
+
+      await client.query(
+        `INSERT INTO ledger_entries (ledger_transaction_id, ledger_account_id, direction, amount)
+         VALUES ($1, $2, $3, $4)`,
+        [txId, accountA, 'DEBIT', 1000]
+      );
+
+      await client.query(
+        `INSERT INTO ledger_entries (ledger_transaction_id, ledger_account_id, direction, amount)
+         VALUES ($1, $2, $3, $4)`,
+        [txId, accountB, 'CREDIT', 900]
+      );
+
+      // COMMIT should fail because the deferred trigger runs at commit time
+      await expect(client.query('COMMIT')).rejects.toThrow('unbalanced');
+
+      // Verify nothing persisted
+      const checkTx = await pool.query(
+        `SELECT * FROM ledger_transactions WHERE type = $1`,
+        [txType]
+      );
+      expect(checkTx.rows).toHaveLength(0);
+    } finally {
+      try {
+        await client.query('ROLLBACK');
+      } catch {
+        // Already rolled back
+      }
+      client.release();
+    }
+  });
+
+  it('database accepts balanced transactions via deferred trigger', async () => {
+    const client = await pool.connect();
+    try {
+      // Start transaction
+      await client.query('BEGIN');
+
+      // Insert a balanced transaction: 1000 debit, 1000 credit
+      // Use unique type to avoid test pollution
+      const txType = 'TEST_TRIGGER_BALANCED_' + Date.now();
+      const txRes = await client.query(
+        `INSERT INTO ledger_transactions (type) VALUES ($1) RETURNING id`,
+        [txType]
+      );
+      const txId = txRes.rows[0].id;
+
+      await client.query(
+        `INSERT INTO ledger_entries (ledger_transaction_id, ledger_account_id, direction, amount)
+         VALUES ($1, $2, $3, $4)`,
+        [txId, accountA, 'DEBIT', 1000]
+      );
+
+      await client.query(
+        `INSERT INTO ledger_entries (ledger_transaction_id, ledger_account_id, direction, amount)
+         VALUES ($1, $2, $3, $4)`,
+        [txId, accountB, 'CREDIT', 1000]
+      );
+
+      // COMMIT should succeed (the deferred trigger runs and passes)
+      await client.query('COMMIT');
+
+      // Verify it persisted
+      const checkTx = await pool.query(
+        `SELECT * FROM ledger_transactions WHERE type = $1`,
+        [txType]
+      );
+      expect(checkTx.rows).toHaveLength(1);
+    } finally {
+      try {
+        await client.query('ROLLBACK');
+      } catch {
+        // Already committed or rolled back
+      }
+      client.release();
+    }
+  });
 });
 
 afterAll(async () => {

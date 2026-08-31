@@ -12,10 +12,11 @@ were trusted.
 ## Built and tested so far
 
 - **Double-entry ledger with database-enforced invariants** — every
-  transaction's debits must equal its credits (guarded in code, verified
-  by a global invariant test over the whole ledger); amounts are
-  `BIGINT` with `CHECK (amount > 0)`; account and direction validity
-  are enforced by FK and CHECK constraints, not application discipline
+  transaction's debits must equal its credits (fail-fast code guards for UX,
+  enforced by a deferred database trigger at commit time, verified by a global
+  invariant test over the whole ledger); amounts are `BIGINT` with
+  `CHECK (amount > 0)`; account and direction validity are enforced by FK and
+  CHECK constraints, not application discipline
 - **Tamper-proof history** — ledger entries are immutable at the
   database level: a trigger rejects every `UPDATE` and `DELETE`, and a
   test proves it by trying both

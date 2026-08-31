@@ -18,11 +18,15 @@ export async function postLedgerTransactionOnClient(
   input: PostTransactionInput
 ): Promise<string> {
   // Guard 1: Double-entry bookkeeping requires at least 2 entries
+  // This is fail-fast UX; the database trigger is the final enforcer.
   if (input.entries.length < 2) {
     throw new Error('Ledger transaction must contain at least two entries');
   }
 
-  // Guard 2: Debits must equal credits
+  // Guard 2: Debits must equal credits (fail-fast validation in code)
+  // The database enforces the same invariant via a deferred constraint trigger
+  // that runs at COMMIT time, catching any unbalanced transactions that bypass
+  // this code (e.g., raw SQL inserts or bugs in transaction building).
   let debitTotal = 0n;
   let creditTotal = 0n;
 
